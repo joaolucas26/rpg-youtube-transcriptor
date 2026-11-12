@@ -53,11 +53,24 @@ def run_transcription():
 
     video_folder_name = os.path.splitext(os.path.basename(session_audio_path))[0]
     video_output_folder = os.path.join(OUTPUTS_FOLDER, video_folder_name)
-    os.makedirs(video_output_folder, exist_ok=True)
-    for old_file in os.listdir(video_output_folder):
-        if old_file.endswith((".txt", ".csv", ".json")):
-            os.remove(os.path.join(video_output_folder, old_file))
-    final_transcript_path = os.path.join(video_output_folder, "final_session_transcript.txt")
+    transcriptions_folder = os.path.join(video_output_folder, "transcriptions")
+    analytics_folder = os.path.join(video_output_folder, "analytics")
+
+    os.makedirs(transcriptions_folder, exist_ok=True)
+    os.makedirs(analytics_folder, exist_ok=True)
+
+    for folder in (transcriptions_folder, analytics_folder):
+        for old_file in os.listdir(folder):
+            if old_file.endswith((".txt", ".csv", ".json")):
+                os.remove(os.path.join(folder, old_file))
+
+    suggested_samples_folder = os.path.join(analytics_folder, "suggested_samples")
+    if os.path.exists(suggested_samples_folder):
+        for old_sample in os.listdir(suggested_samples_folder):
+            if old_sample.endswith((".wav", ".ogg", ".flac", ".mp3")):
+                os.remove(os.path.join(suggested_samples_folder, old_sample))
+
+    final_transcript_path = os.path.join(transcriptions_folder, "final_session_transcript.txt")
 
     vad_model, get_speech_timestamps = load_silero_vad_model()
     speaker_model = load_speaker_model()
@@ -74,7 +87,7 @@ def run_transcription():
         print("⚠️ Nenhuma fala detectada no áudio.")
         return
 
-    # Warm-up: alinha samples externos (ex: WhatsApp) ao microfone da sessão e/ou
+    # Warm-up: alinha samples externos ao microfone da sessão e/ou
     # descobre automaticamente os clusters de voz caso o cliente não tenha enviado samples
     character_profiles = warmup_session_profiles(
         audio=audio,
@@ -84,7 +97,7 @@ def run_transcription():
         max_speakers=MAX_SPEAKERS,
     )
 
-    analytics = SessionAnalytics(samples_folder=SAMPLES_FOLDER)
+    analytics = SessionAnalytics(samples_folder=SAMPLES_FOLDER, output_folder=analytics_folder)
     analytics.inspect_samples(character_profiles)
 
     total_chunks = len(speech_timestamps)
@@ -121,9 +134,9 @@ def run_transcription():
                 speech_chunk, start_ms, speaker_name, whisper_model, initial_prompt
             )
 
-            # Salvar imediatamente no log individual do personagem dentro da pasta do vídeo
+            # Salvar imediatamente no log individual do personagem dentro da pasta transcriptions
             if chunk_entries:
-                log_filename = os.path.join(video_output_folder, f"{speaker_name}_log.txt")
+                log_filename = os.path.join(transcriptions_folder, f"{speaker_name}_log.txt")
                 with open(log_filename, "a", encoding="utf-8") as log_file:
                     for entry in chunk_entries:
                         start_time = format_timestamp(entry["start"])
@@ -138,8 +151,8 @@ def run_transcription():
             torch.cuda.empty_cache()
 
         # Gerar relatórios de Analytics e unificar logs
-        analytics.save_reports(video_output_folder, character_profiles)
-        merge_logs_from_folder(video_output_folder, final_transcript_path)
+        analytics.save_reports(analytics_folder, character_profiles)
+        merge_logs_from_folder(transcriptions_folder, final_transcript_path)
 
 
 if __name__ == "__main__":

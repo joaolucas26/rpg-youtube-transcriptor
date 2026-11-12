@@ -78,6 +78,7 @@ def load_character_profiles(
 
     print(f"Loading character voice profiles from '{samples_folder}'...")
     grouped_embeddings: dict[str, list[torch.Tensor]] = {}
+    grouped_file_means: dict[str, list[torch.Tensor]] = {}
 
     if os.path.exists(samples_folder):
         with torch.no_grad():
@@ -93,15 +94,19 @@ def load_character_profiles(
                 audio_16k = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)
 
                 win_embs = _encode_audio_windows(audio_16k, speaker_model)
+                file_mean = torch.nn.functional.normalize(
+                    torch.stack(win_embs, dim=0).mean(dim=0), dim=0
+                )
                 grouped_embeddings.setdefault(character_name, []).extend(win_embs)
+                grouped_file_means.setdefault(character_name, []).append(file_mean)
                 print(
                     f"Amostra carregada: {filename} -> perfil '{character_name}' "
                     f"({len(win_embs)} janelas de voz)"
                 )
 
     raw_anchors = {}
-    for character_name, embeddings in grouped_embeddings.items():
-        mean_emb = torch.stack(embeddings, dim=0).mean(dim=0)
+    for character_name, file_means in grouped_file_means.items():
+        mean_emb = torch.stack(file_means, dim=0).mean(dim=0)
         raw_anchors[character_name] = torch.nn.functional.normalize(mean_emb, dim=0)
 
     # Subtrai parcialmente a média comum do canal (ex: assinatura acústica do WhatsApp)

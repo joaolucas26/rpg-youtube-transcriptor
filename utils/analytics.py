@@ -8,8 +8,9 @@ from utils.utils import format_timestamp
 
 
 class SessionAnalytics:
-    def __init__(self, samples_folder: str = "inputs/sample_audios"):
+    def __init__(self, samples_folder: str = "inputs/sample_audios", output_folder: str | None = None):
         self.samples_folder = samples_folder
+        self.output_folder = output_folder
         self.sample_durations: dict[str, list[tuple[str, float]]] = defaultdict(list)
         self.initial_cross_similarity: dict[str, dict[str, float]] = {}
         self.records: list[dict] = []
@@ -79,7 +80,7 @@ class SessionAnalytics:
         if was_adapted:
             self.adaptation_counts[chosen_speaker] += 1
 
-        # Guarda o melhor corte de áudio (>= 3.5s) de cada speaker para exportar em suggested_samples/
+        # Guarda e já exporta em tempo real o melhor corte de áudio (>= 3.5s) de cada speaker
         if (
             speech_chunk is not None
             and chosen_speaker != "ignored"
@@ -94,6 +95,8 @@ class SessionAnalytics:
                     speech_chunk,
                     ts_str,
                 )
+                if self.output_folder:
+                    self._export_single_sample(self.output_folder, chosen_speaker, speech_chunk)
 
         self.records.append(
             {
@@ -112,13 +115,22 @@ class SessionAnalytics:
             }
         )
 
+    def _export_single_sample(self, output_folder: str, spk_name: str, clip: AudioSegment):
+        suggested_folder = os.path.join(output_folder, "suggested_samples")
+        os.makedirs(suggested_folder, exist_ok=True)
+        clip_path = os.path.join(suggested_folder, f"{spk_name}.wav")
+        try:
+            clip.export(clip_path, format="wav")
+        except Exception as e:
+            print(f"⚠️ Erro ao exportar sample sugerido '{clip_path}': {e}")
+
     def save_reports(self, output_folder: str, character_profiles: dict):
         """
         Gera na pasta de saída do vídeo:
         1. analytics_report.txt (Relatório legível com diagnósticos e recomendações)
         2. analytics_chunks.csv (Tabela detalhada trecho a trecho com todos os scores)
         3. analytics_summary.json (Dados estruturados)
-        4. suggested_samples/<speaker>.ogg (Melhores trechos de voz recortados automaticamente)
+        4. suggested_samples/<speaker>.wav (Melhores trechos de voz recortados automaticamente)
         """
         if not self.records:
             print("⚠️ Nenhum dado de analytics registrado para salvar.")
@@ -130,15 +142,10 @@ class SessionAnalytics:
         json_path = os.path.join(output_folder, "analytics_summary.json")
         suggested_folder = os.path.join(output_folder, "suggested_samples")
 
-        # Exporta automaticamente o melhor sample de áudio de cada speaker
+        # Garante que todos os melhores samples estejam exportados ao final
         if self.best_audio_clips:
-            os.makedirs(suggested_folder, exist_ok=True)
-            for spk_name, (_, sc, clip, _) in self.best_audio_clips.items():
-                clip_path = os.path.join(suggested_folder, f"{spk_name}.ogg")
-                try:
-                    clip.export(clip_path, format="ogg")
-                except Exception:
-                    pass
+            for spk_name, (_, _, clip, _) in self.best_audio_clips.items():
+                self._export_single_sample(output_folder, spk_name, clip)
 
         known_characters = list(character_profiles.keys())
         total_chunks = len(self.records)
@@ -338,7 +345,7 @@ class SessionAnalytics:
                 diagnostics.append(
                     f"💡 SAMPLE ORIGINAL DEFASADO ('{name}'): O perfil auto-calibrado teve score médio {st['avg_current_when_won']:.3f}, "
                     f"bem acima do sample original ({st['avg_anchor_when_won']:.3f}). Substituir o sample de '{name}' pelo arquivo "
-                    f"em 'suggested_samples/{name}.ogg' vai melhorar os primeiros minutos!"
+                    f"em 'suggested_samples/{name}.wav' vai melhorar os primeiros minutos!"
                 )
 
         if speaker_stats.get("ignored", {}).get("chunks_pct", 0.0) > 25.0:
