@@ -1,0 +1,8 @@
+/sample_audios/*
+dnd_audio/*
+youtube_original_audio/*
+venv/
+/pretrained_models/*
+/transcription_player_logs/*
+*/__pycache__/*
+ 
