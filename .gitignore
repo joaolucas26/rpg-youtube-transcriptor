@@ -1,25 +1,11 @@
-/sample_audios/*
-dnd_audio/*
-youtube_original_audio/*
+inputs/sample_audios/*
+inputs/youtube_original_audio/*
+outputs/*
 venv/
-/pretrained_models/*
-/transcription_player_logs/*
+pretrained_models/*
 */__pycache__/*
 
-/sample_audios/*
-dnd_audio/*
-youtube_original_audio/*
-venv/
-/pretrained_models/*
-/transcription_player_logs/*
-*/__pycache__/*
-
-# Manter as pastas vazias no repositório
+# Manter as pastas vazias e o initial_prompt no repositório
 !/**/.gitkeep
-
-  
-
-  
-
-  
- 
+!inputs/initial_prompt.txt
+*temp_*
