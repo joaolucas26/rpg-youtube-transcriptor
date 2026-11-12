@@ -12,13 +12,15 @@ def load_whisper_model(model_name="medium"):
     return whisper_model
 
 
-def transcribe_chunk(speech_chunk, start_ms, speaker_name, whisper_model):
+def transcribe_chunk(speech_chunk, start_ms, speaker_name, whisper_model, initial_prompt):
     temp_chunk_path = "temp_chunk.wav"
     speech_chunk.export(temp_chunk_path, format="wav")
     result = whisper_model.transcribe(
         temp_chunk_path,
         language="pt",
-        fp16=torch.cuda.is_available()
+        fp16=torch.cuda.is_available(),
+        initial_prompt=initial_prompt,
+        condition_on_previous_text=False,
     )
 
     chunk_transcripts = []
